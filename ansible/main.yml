@@ -1,4 +1,4 @@
 ---
-- hosts: test
+- hosts: machines
   roles:
   - configure_webserver

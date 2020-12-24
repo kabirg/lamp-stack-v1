@@ -151,6 +151,19 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
+# NAT Gateway
+resource "aws_eip" "nat" {
+  vpc      = true
+}
+
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = values(aws_subnet.public_subnets)[0].id
+  tags = {
+    Name = "${var.resource_name_prefix}_nat"
+  }
+}
+
 # SECURITY GROUPS
 resource "aws_security_group" "nat_sg" {
   name   = "nat_sg"
@@ -295,7 +308,7 @@ resource "aws_security_group" "ansible_sg" {
   }
 }
 
-#ROUTE TABLE FOR PUBLIC SUBNET (need this for SSH access)
+#ROUTE TABLE FOR PUBLIC SUBNET (need this for SSH access into public-subnet instances)
 resource "aws_route_table" "public-rt" {
   vpc_id = aws_vpc.main.id
 
@@ -312,6 +325,25 @@ resource "aws_route_table_association" "public-rt-association" {
   count = length(var.public_subnets)
   subnet_id      = values(aws_subnet.public_subnets)[count.index].id
   route_table_id = aws_route_table.public-rt.id
+}
+
+# Needed for Internet Access (via NAT) for private instances
+resource "aws_route_table" "private-rt" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.nat.id
+  }
+  tags = {
+    Name = "${var.resource_name_prefix}-private-rt"
+  }
+}
+
+resource "aws_route_table_association" "private-rt-association" {
+  count = length(var.private_subnets)
+  subnet_id      = values(aws_subnet.private_subnets)[count.index].id
+  route_table_id = aws_route_table.private-rt.id
 }
 
 # LOGGING BUCKET
@@ -369,10 +401,15 @@ resource "aws_autoscaling_group" "asg" {
   max_size             = 2
   min_size             = 1
   launch_configuration = aws_launch_configuration.launch_config.name
-  vpc_zone_identifier = [values(aws_subnet.private_subnets)[0].id, values(aws_subnet.private_subnets)[1].id]
+  vpc_zone_identifier = [values(aws_subnet.private_subnets)[2].id, values(aws_subnet.private_subnets)[3].id]
   tag {
     key                 = "Resource"
     value               = "ASG"
+    propagate_at_launch = true
+  }
+  tag {
+    key                 = "Name"
+    value               = "app-server"
     propagate_at_launch = true
   }
 }
@@ -391,6 +428,7 @@ resource "aws_instance" "ansible_controller" {
 
   tags = {
     Name = "${var.resource_name_prefix}_ansible_controller"
+    managed_by = "Terraform"
   }
 
   # To install Ansible, we need the EPEL (Extra Packages for Linux) software repo.
@@ -402,6 +440,9 @@ resource "aws_instance" "ansible_controller" {
               yum update -y &> /root/status.txt
               yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm &>> /root/status.txt
               yum -y install ansible git &>> /root/status.txt
+              git clone https://github.com/kabirg/lamp-stack-v1.git /home/ec2-user/lamp-stack-v1
+              chown -R ec2-user /home/ec-2user/lamp-stack-v1
+              chgrp -R ec2-user /home/ec-2user/lamp-stack-v1
               echo 'done' >> /root/status.txt
               EOF
 }

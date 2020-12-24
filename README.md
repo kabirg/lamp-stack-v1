@@ -5,3 +5,4 @@ Enhancements
 - Use cloudposse for tags
 - modularize
 - Add SSL
+- Move webservers to public subnet, maintain app servers in private subnet, LB between them
