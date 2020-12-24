@@ -1,3 +1,9 @@
 ---
   - name: Run Dockerized Flask Application
-    shell: docker run -d -p 5000:5000 --name flask-app kabirgupta3/sample-flask-app
+    docker_container:
+      name: flask-app
+      image: kabirgupta3/sample-flask-app
+      state: started
+      detach: yes
+      ports:
+      - "5000:5000"
