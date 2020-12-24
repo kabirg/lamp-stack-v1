@@ -8,6 +8,13 @@
     when: ansible_os_family == 'RedHat'
     loop: "{{ packages }}"
 
+  # Required by the docker_container ansible module (https://docs.ansible.com/ansible/2.6/modules/docker_container_module.html#docker-container-module)
+  - name: Install pip dependencies
+    become: yes
+    become_user: root
+    pip:
+      name: docker
+
   - name: Install Container-SElinux
     become: yes
     become_user: root

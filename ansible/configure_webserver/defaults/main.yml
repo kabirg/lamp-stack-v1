@@ -4,6 +4,8 @@ packages:
   - yum-utils
   - device-mapper-persistent-data
   - lvm2
+  - https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+  - python-pip
 
 docker_edition: ce
 docker_software_repo: https://download.docker.com/linux/{{ (ansible_os_family == 'RedHat') | ternary('centos', 'none') }}/docker-{{ docker_edition }}.repo
