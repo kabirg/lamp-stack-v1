@@ -1,0 +1,72 @@
+---
+  - name: Install package dependencies
+    become: yes
+    become_user: root
+    package:
+      name: "{{ item }}"
+      state: present
+    when: ansible_os_family == 'RedHat'
+    loop: "{{ packages }}"
+
+  - name: Install Container-SElinux
+    become: yes
+    become_user: root
+    yum:
+      name: http://mirror.centos.org/centos/7/extras/x86_64/Packages/container-selinux-2.107-3.el7.noarch.rpm
+      state: present
+    when: ansible_os_family == 'RedHat'
+
+  # Equivalent to yum-config-manager --add-repo xxx
+  # Downloads the Repo config file from Docker's download link, and adds it to the file specified in /etc/yum.repos.d
+  # Requires HTTPS internet access
+  - name: Add the Docker Software Repository
+    become: yes
+    become_user: root
+    get_url:
+      url: "{{ docker_software_repo }}"
+      dest: /etc/yum.repos.d/docker-{{ docker_edition }}.repo
+      mode: 0644
+      owner: root
+      group: root
+    when: ansible_os_family == 'RedHat'
+
+  #https://forums.docker.com/t/docker-ce-stable-x86-64-repo-not-available-https-error-404-not-found-https-download-docker-com-linux-centos-7server-x86-64-stable-repodata-repomd-xml/98965/6
+  - name: Bugfix - Broken Docker Repo
+    become: yes
+    become_user: root
+    shell: sed -i 's/$releasever/7/g' /etc/yum.repos.d/docker-"{{ docker_edition }}".repo
+
+  - name: Install the Docker CLI, Engine & Containerd
+    become: yes
+    become_user: root
+    yum:
+      name: "{{ item }}"
+      state: present
+    loop: "{{ docker_packages }}"
+
+  - name: Start and enable the Docker service
+    become: yes
+    become_user: root
+    service:
+      name: docker
+      state: started
+      enabled: yes
+
+  # Socket is owned by root-user and docker-group
+  # https://techoverflow.net/2018/12/15/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket/
+  - name: Add ec2-user to the 'docker' group
+    become: yes
+    become_user: root
+    user:
+      name: ec2-user
+      append: yes
+      groups: docker
+
+  - name: Reboot a Machine to allow ec2-user to execute Docker commands
+    become: yes
+    become_user: root
+    reboot:
+      reboot_timeout: 3600
+  #
+  # - name: Restart Docker Service to Apply Config Updates
+  #   meta: flush_handlers

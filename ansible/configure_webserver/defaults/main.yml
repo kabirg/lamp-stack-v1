@@ -1,0 +1,18 @@
+---
+# defaults file for configure_webserver
+packages:
+  - yum-utils
+  - device-mapper-persistent-data
+  - lvm2
+
+docker_edition: ce
+docker_software_repo: https://download.docker.com/linux/{{ (ansible_os_family == 'RedHat') | ternary('centos', 'none') }}/docker-{{ docker_edition }}.repo
+
+# The new stable version (20.10.0) is broken due to some unresolved dependencies in the container-tools module:
+# https://github.com/geerlingguy/ansible-role-docker/issues/243
+# Version 19.03.14 causes an unsolvable "curl: (56) Recv failure: Connection reset by peer" error. Have to revert to Docker-Ce v18:
+# https://stackoverflow.com/questions/64610277/centos-docker-connection-reset-by-peer
+docker_packages:
+  - docker-ce-3:18.09.0-3.*
+  - docker-ce-cli
+  - containerd.io
