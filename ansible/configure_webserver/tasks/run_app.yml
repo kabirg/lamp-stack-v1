@@ -1,9 +1,26 @@
 ---
+  - name: Create User-Bridged Network
+    docker_network:
+      name: flask-app-network
+
   - name: Run Dockerized Flask Application
     docker_container:
       name: flask-app
-      image: kabirgupta3/sample-flask-app
+      image: kabirgupta3/sample-flask-app:v2
       state: started
       detach: yes
+      networks:
+      - name: flask-app-network
       ports:
       - "5000:5000"
+
+  - name: Run NGINX Reverse Proxy Server
+    docker_container:
+      name: nginx-proxy
+      image: kabirgupta3/nginx:v1
+      state: started
+      detach: yes
+      networks:
+      - name: flask-app-network
+      ports:
+      - "80:80"
