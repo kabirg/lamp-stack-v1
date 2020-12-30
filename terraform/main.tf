@@ -102,8 +102,33 @@ data "aws_ami" "base_rhel_image" {
 #################################
 # ROUTE53
 resource "aws_route53_zone" "primary" {
-  name = "kabirg.dev"
+  name = "kabirg-sandbox.me"
 }
+
+resource "aws_route53_record" "root" {
+  zone_id = aws_route53_zone.primary.zone_id
+  name    = "kabirg-sandbox.me"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.app_lb.dns_name
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "www" {
+  zone_id = aws_route53_zone.primary.zone_id
+  name    = "www.kabirg-sandbox.me"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.app_lb.dns_name
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
+
 
 # VPC
 resource "aws_vpc" "main" {
@@ -250,6 +275,13 @@ resource "aws_security_group" "web_sg" {
     security_groups = [aws_security_group.ansible_sg.id]
   }
 
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -356,6 +388,14 @@ resource "aws_s3_bucket" "my_bucket" {
   }
 }
 
+# SSL Certificiate Upload to IAM (can't use ACM since 4096-bit RSA Certs aren't supported w/ACM)
+# Source: https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/ssl-server-cert.html#upload-cert
+resource "aws_iam_server_certificate" "self_signed_cert" {
+  name             = "${var.resource_name_prefix}-cert"
+  certificate_body = file("cert/self-ca-cert.pem")
+  private_key      = file("cert/key.pem")
+}
+
 # LOAD BALANCER, TARGET GRUOP & LISTENER
 resource "aws_lb" "app_lb" {
   name               = "${var.resource_name_prefix}-alb"
@@ -376,10 +416,23 @@ resource "aws_lb_target_group" "app_tg" {
   vpc_id   = aws_vpc.main.id
 }
 
-resource "aws_lb_listener" "front_end" {
+resource "aws_lb_listener" "front_end_http" {
   load_balancer_arn = aws_lb.app_lb.arn
   port              = "80"
   protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
+}
+
+resource "aws_lb_listener" "front_end_htps" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = aws_iam_server_certificate.self_signed_cert.arn
 
   default_action {
     type             = "forward"
@@ -412,6 +465,11 @@ resource "aws_autoscaling_group" "asg" {
     value               = "app-server"
     propagate_at_launch = true
   }
+}
+
+resource "aws_autoscaling_attachment" "asg_attachment" {
+  autoscaling_group_name = aws_autoscaling_group.asg.id
+  alb_target_group_arn   = aws_lb_target_group.app_tg.arn
 }
 
 # ANSIBLE MANAGER
