@@ -55,3 +55,4 @@ You should now be able to hit your URL in your browser.
 - Add more validation for TF code (i.e can / try blocks)
 - Use cidrsubnet function to condense subnet input.
 - Use cloudposse for tags
+- Add a database layer
