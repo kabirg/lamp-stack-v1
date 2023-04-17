@@ -9,3 +9,4 @@ override.tf.json
 *_override.tf.json
 terraform/cert/key.pem
 terraform/cert/self-ca-cert.pem
+.DS_Store
