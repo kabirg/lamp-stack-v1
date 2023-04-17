@@ -88,7 +88,7 @@ src: https://www.reddit.com/r/aws/comments/j1f6uj/does_alb_remove_the_need_to_pu
 	⁃	So an ALB can hand of requests to NGINX and move on to handling new requests, rather than getting tied down. NGINX has the ability to queue up extra requests.
 	⁃	From a performance perspective, it’s better to have NGINX on the app server (or in the same container or asa sidecar), rather than on a separate server/container.
 
-
+ 
 
 # Sources:
 	⁃	Why use Web/App servers:
